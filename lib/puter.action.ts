@@ -30,6 +30,18 @@ export const createProject = async ({ item, visibility = "private" }: CreateProj
     const hostedRender = projectId && item.renderedImage ?
         await uploadImageToHosting({ hosting, url: item.renderedImage, projectId, label: 'rendered', }) : null;
 
+    const hostedVersions = projectId && item.versions?.length
+        ? await Promise.all(item.versions.map(async (version) => {
+            const hosted = await uploadImageToHosting({
+                hosting,
+                url: version.image,
+                projectId,
+                label: `version-${version.id}`,
+            });
+            return {...version, image: hosted?.url || version.image};
+        }))
+        : item.versions;
+
     const resolvedSource = hostedSource?.url || (isHostedUrl(item.sourceImage)
         ? item.sourceImage
         : ''
@@ -57,6 +69,7 @@ export const createProject = async ({ item, visibility = "private" }: CreateProj
         ...rest,
         sourceImage: resolvedSource,
         renderedImage: resolvedRender,
+        versions: hostedVersions,
     }
 
     try {

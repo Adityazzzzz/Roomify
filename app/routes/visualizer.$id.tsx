@@ -1,209 +1,39 @@
-import { useNavigate, useOutletContext, useParams} from "react-router";
+import {useNavigate, useOutletContext, useParams} from "react-router";
 import {useEffect, useRef, useState} from "react";
 import {generate3DView} from "../../lib/ai.action";
-import {Box, Download, RefreshCcw, Share2, X} from "lucide-react";
+import {Box, Download, RefreshCcw, Share2, X, History, Sparkles, Plus, Check, MapPin, FileDown} from "lucide-react";
 import Button from "../../components/ui/Button";
 import {createProject, getProjectById} from "../../lib/puter.action";
 import {ReactCompareSlider, ReactCompareSliderImage} from "react-compare-slider";
 
-const VisualizerId = () => {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const { userId } = useOutletContext<AuthContext>()
+const styles: {id: DesignStyle; label: string}[] = [{id:"modern",label:"Modern minimal"},{id:"scandinavian",label:"Scandinavian"},{id:"industrial",label:"Industrial"},{id:"luxury",label:"Luxury"},{id:"traditional",label:"Traditional"},{id:"empty",label:"Empty"}];
+const views: {id: RenderView; label: string}[] = [{id:"top-down",label:"Top-down"},{id:"dollhouse",label:"Dollhouse"},{id:"interior",label:"Interior"},{id:"night",label:"Night"}];
+const quickFeedback = ["More furniture", "Warmer lighting", "Add plants", "Darker walls"];
+const defaultRooms: RoomDefinition[] = [
+    {id:"living",name:"Living room",type:"Living",area:220,floor:"Oak",walls:"Warm white",furniture:"standard"},
+    {id:"bedroom",name:"Bedroom",type:"Bedroom",area:160,floor:"Oak",walls:"Soft neutral",furniture:"standard"},
+    {id:"kitchen",name:"Kitchen",type:"Kitchen",area:110,floor:"Tile",walls:"Warm white",furniture:"minimal"},
+];
+const download = (href:string, filename:string) => { const link=document.createElement("a"); link.href=href; link.download=filename; document.body.appendChild(link); link.click(); link.remove(); };
 
-    const hasInitialGenerated = useRef(false);
-
-    const [project, setProject] = useState<DesignItem | null>(null);
-    const [isProjectLoading, setIsProjectLoading] = useState(true);
-
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [currentImage, setCurrentImage] = useState<string | null>(null);
-
-    const handleBack = () => navigate('/');
-    const handleExport = () => {
-        if (!currentImage) return;
-
-        const link = document.createElement('a');
-        link.href = currentImage;
-        link.download = `roomify-${id || 'design'}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-
-    const runGeneration = async (item: DesignItem) => {
-        if(!id || !item.sourceImage) return;
-
-        try {
-            setIsProcessing(true);
-            const result = await generate3DView({ sourceImage: item.sourceImage });
-
-            if(result.renderedImage) {
-                setCurrentImage(result.renderedImage);
-
-                const updatedItem = {
-                    ...item,
-                    renderedImage: result.renderedImage,
-                    renderedPath: result.renderedPath,
-                    timestamp: Date.now(),
-                    ownerId: item.ownerId ?? userId ?? null,
-                    isPublic: item.isPublic ?? false,
-                }
-
-                const saved = await createProject({ item: updatedItem, visibility: "private" })
-
-                if(saved) {
-                    setProject(saved);
-                    setCurrentImage(saved.renderedImage || result.renderedImage);
-                }
-            }
-        } catch (error) {
-            console.error('Generation failed: ', error)
-        } finally {
-            setIsProcessing(false);
-        }
-    }
-
-    useEffect(() => {
-        let isMounted = true;
-
-        const loadProject = async () => {
-            if (!id) {
-                setIsProjectLoading(false);
-                return;
-            }
-
-            setIsProjectLoading(true);
-
-            const fetchedProject = await getProjectById({ id });
-
-            if (!isMounted) return;
-
-            setProject(fetchedProject);
-            setCurrentImage(fetchedProject?.renderedImage || null);
-            setIsProjectLoading(false);
-            hasInitialGenerated.current = false;
-        };
-
-        loadProject();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [id]);
-
-    useEffect(() => {
-        if (
-            isProjectLoading ||
-            hasInitialGenerated.current ||
-            !project?.sourceImage
-        )
-            return;
-
-        if (project.renderedImage) {
-            setCurrentImage(project.renderedImage);
-            hasInitialGenerated.current = true;
-            return;
-        }
-
-        hasInitialGenerated.current = true;
-        void runGeneration(project);
-    }, [project, isProjectLoading]);
-
-    return (
-        <div className="visualizer">
-            <nav className="topbar">
-                <div className="brand">
-                    <Box className="logo" />
-
-                    <span className="name">Roomify</span>
-                </div>
-                <Button variant="ghost" size="sm" onClick={handleBack} className="exit">
-                    <X className="icon" /> Exit Editor
-                </Button>
-            </nav>
-
-            <section className="content">
-                <div className="panel">
-                    <div className="panel-header">
-                        <div className="panel-meta">
-                            <p>Project</p>
-                            <h2>{project?.name || `Residence ${id}`}</h2>
-                            <p className="note">Created by You</p>
-                        </div>
-
-                        <div className="panel-actions">
-                            <Button
-                                size="sm"
-                                onClick={handleExport}
-                                className="export"
-                                disabled={!currentImage}
-                            >
-                                <Download className="w-4 h-4 mr-2" /> Export
-                            </Button>
-                            <Button size="sm" onClick={() => {}} className="share">
-                                <Share2 className="w-4 h-4 mr-2" />
-                                Share
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div className={`render-area ${isProcessing ? 'is-processing': ''}`}>
-                        {currentImage ? (
-                            <img src={currentImage} alt="AI Render" className="render-img" />
-                        ) : (
-                            <div className="render-placeholder">
-                                {project?.sourceImage && (
-                                    <img src={project?.sourceImage} alt="Original" className="render-fallback" />
-                                )}
-                            </div>
-                        )}
-
-                        {isProcessing && (
-                            <div className="render-overlay">
-                                <div className="rendering-card">
-                                    <RefreshCcw className="spinner" />
-                                    <span className="title">Rendering...</span>
-                                    <span className="subtitle">Generating your 3D visualization</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                </div>
-
-                <div className="panel compare">
-                    <div className="panel-header">
-                        <div className="panel-meta">
-                            <p>Comparison</p>
-                            <h3>Before and After</h3>
-                        </div>
-                        <div className="hint">Drag to compare</div>
-                    </div>
-
-                    <div className="compare-stage">
-                        {project?.sourceImage && currentImage ? (
-                            <ReactCompareSlider
-                                defaultValue={50}
-                                style={{ width: '100%', height: 'auto' }}
-                                itemOne={
-                                    <ReactCompareSliderImage src={project?.sourceImage} alt="before" className="compare-img" />
-                                }
-                                itemTwo={
-                                    <ReactCompareSliderImage src={currentImage || project?.renderedImage} alt="after" className="compare-img" />
-                                }
-                            />
-                        ) : (
-                            <div className="compare-fallback">
-                                {project?.sourceImage && (
-                                    <img src={project.sourceImage} alt="Before" className="compare-img" />
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </section>
-        </div>
-    )
+export default function VisualizerId() {
+    const {id}=useParams(); const navigate=useNavigate(); const {userId}=useOutletContext<AuthContext>(); const initialized=useRef(false);
+    const [project,setProject]=useState<DesignItem|null>(null); const [loading,setLoading]=useState(true); const [processing,setProcessing]=useState(false); const [currentImage,setCurrentImage]=useState<string|null>(null);
+    const [style,setStyle]=useState<DesignStyle>("modern"); const [view,setView]=useState<RenderView>("top-down"); const [feedback,setFeedback]=useState(""); const [rooms,setRooms]=useState<RoomDefinition[]>(defaultRooms); const [selectedRoom,setSelectedRoom]=useState("living"); const [shareCopied,setShareCopied]=useState(false);
+    const persist=async(next:DesignItem)=>{setProject(next);const saved=await createProject({item:next,visibility:next.isPublic?"public":"private"});if(saved)setProject(saved);return saved;};
+    const runGeneration=async(item:DesignItem, refinement=feedback)=>{if(!id||!item.sourceImage)return;try{setProcessing(true);const result=await generate3DView({sourceImage:item.sourceImage,style,view,feedback:refinement,rooms});if(!result.renderedImage)return;const version:RenderVersion={id:`${Date.now()}`,image:result.renderedImage,createdAt:Date.now(),style,view,feedback:refinement||undefined};const next:DesignItem={...item,renderedImage:result.renderedImage,renderedPath:result.renderedPath,style,view,rooms,versions:[...(item.versions||[]),version],timestamp:Date.now(),ownerId:item.ownerId??userId??null};setCurrentImage(result.renderedImage);await persist(next);}catch(error){console.error("Generation failed:",error);}finally{setProcessing(false);}};
+    useEffect(()=>{let alive=true;const load=async()=>{if(!id)return;setLoading(true);const item=await getProjectById({id});if(!alive)return;setProject(item);setCurrentImage(item?.renderedImage||null);setStyle(item?.style||"modern");setView(item?.view||"top-down");setRooms(item?.rooms?.length?item.rooms:defaultRooms);setLoading(false);initialized.current=false;};void load();return()=>{alive=false;};},[id]);
+    useEffect(()=>{if(loading||initialized.current||!project?.sourceImage)return;initialized.current=true;if(!project.renderedImage)void runGeneration(project);},[project,loading]);
+    const updateRoom=(key:keyof RoomDefinition,value:string)=>setRooms(all=>all.map(room=>room.id===selectedRoom?{...room,[key]:key==="area"?Number(value):value}:room));
+    const addRoom=()=>{const room:RoomDefinition={id:`room-${Date.now()}`,name:"New room",type:"Custom",area:100,floor:"Oak",walls:"Warm white",furniture:"minimal"};setRooms(all=>[...all,room]);setSelectedRoom(room.id);};
+    const share=async()=>{if(!project)return;const next={...project,isPublic:true,shareId:project.shareId||crypto.randomUUID()};await persist(next);await navigator.clipboard.writeText(`${window.location.origin}/visualizer/${project.id}?share=${next.shareId}`);setShareCopied(true);setTimeout(()=>setShareCopied(false),1800);};
+    const exportSheet=()=>{if(!project)return;const sheet=`ROOMIFY DESIGN SHEET\n${project.name||"Untitled project"}\n\nStyle: ${style}\nView: ${view}\n\nROOM SCHEDULE\n${rooms.map(r=>`${r.name} — ${r.type}, ${r.area||"—"} sq ft; ${r.floor} floors, ${r.walls} walls, ${r.furniture} furniture`).join("\n")}`;download(URL.createObjectURL(new Blob([sheet],{type:"text/plain"})),"roomify-design-sheet.txt");};
+    if(loading)return <main className="visualizer-route loading">Loading project…</main>;
+    return <div className="visualizer"><nav className="topbar"><div className="brand"><Box className="logo"/><span className="name">Roomify</span></div><Button variant="ghost" size="sm" onClick={()=>navigate("/")} className="exit"><X className="icon"/> Exit Editor</Button></nav><section className="content">
+        <div className="panel"><div className="panel-header"><div className="panel-meta"><p>Design studio</p><h2>{project?.name||`Residence ${id}`}</h2><p className="note">Exact-plan mode · {rooms.length} rooms configured</p></div><div className="panel-actions"><Button size="sm" onClick={()=>currentImage&&download(currentImage,`roomify-${id}.png`)} className="export" disabled={!currentImage}><Download className="w-4 h-4 mr-2"/> PNG</Button><Button size="sm" onClick={exportSheet} variant="outline"><FileDown className="w-4 h-4 mr-2"/> Sheet</Button><Button size="sm" onClick={share} className="share">{shareCopied?<Check className="w-4 h-4 mr-2"/>:<Share2 className="w-4 h-4 mr-2"/>}{shareCopied?"Link copied":"Share"}</Button></div></div><div className={`render-area ${processing?"is-processing":""}`}>{currentImage?<img src={currentImage} alt="AI architectural render" className="render-img"/>:<div className="render-placeholder"><img src={project?.sourceImage} alt="Original floor plan" className="render-fallback"/></div>}{processing&&<div className="render-overlay"><div className="rendering-card"><RefreshCcw className="spinner"/><span className="title">Rendering your design…</span><span className="subtitle">Preserving plan geometry and applying your selections</span></div></div>}</div></div>
+        <div className="studio-grid"><aside className="studio-controls panel"><div className="control-section"><p className="control-label"><Sparkles size={14}/> Design direction</p><div className="chip-grid">{styles.map(option=><button key={option.id} className={style===option.id?"chip active":"chip"} onClick={()=>setStyle(option.id)}>{option.label}</button>)}</div></div><div className="control-section"><p className="control-label">Camera & lighting</p><div className="chip-grid">{views.map(option=><button key={option.id} className={view===option.id?"chip active":"chip"} onClick={()=>setView(option.id)}>{option.label}</button>)}</div></div><div className="control-section"><p className="control-label">Refine this render</p><div className="quick-feedback">{quickFeedback.map(item=><button key={item} onClick={()=>setFeedback(item)} className={feedback===item?"chip active":"chip"}>{item}</button>)}</div><textarea value={feedback} onChange={e=>setFeedback(e.target.value)} placeholder="e.g. lighter floors, add a reading nook…"/></div><Button fullWidth onClick={()=>project&&runGeneration(project)} disabled={processing||!project}><RefreshCcw className="w-4 h-4 mr-2"/> Regenerate</Button></aside>
+        <section className="room-workspace panel"><div className="workspace-head"><div><p className="control-label"><MapPin size={14}/> Interactive room map</p><span>Set the room program before rendering for more faithful results.</span></div><button className="add-room" onClick={addRoom}><Plus size={15}/> Add room</button></div><div className="room-map">{rooms.map((room,index)=><button key={room.id} className={`room-tile tile-${index%4} ${selectedRoom===room.id?"selected":""}`} onClick={()=>setSelectedRoom(room.id)}><strong>{room.name}</strong><span>{room.area||"—"} sq ft</span></button>)}</div>{rooms.map(room=>room.id===selectedRoom&&<div className="room-editor" key={room.id}><label>Name<input value={room.name} onChange={e=>updateRoom("name",e.target.value)}/></label><label>Type<input value={room.type} onChange={e=>updateRoom("type",e.target.value)}/></label><label>Area (sq ft)<input type="number" value={room.area||""} onChange={e=>updateRoom("area",e.target.value)}/></label><label>Floor<input value={room.floor} onChange={e=>updateRoom("floor",e.target.value)}/></label><label>Walls<input value={room.walls} onChange={e=>updateRoom("walls",e.target.value)}/></label><label>Furniture<select value={room.furniture} onChange={e=>updateRoom("furniture",e.target.value)}><option value="none">None</option><option value="minimal">Minimal</option><option value="standard">Standard</option><option value="full">Full</option></select></label></div>)}</section></div>
+        <div className="panel compare"><div className="panel-header"><div className="panel-meta"><p>Comparison</p><h3>Before and after</h3></div><div className="hint">Drag to compare</div></div><div className="compare-stage">{project?.sourceImage&&currentImage?<ReactCompareSlider defaultValue={50} itemOne={<ReactCompareSliderImage src={project.sourceImage} alt="Original floor plan" className="compare-img"/>} itemTwo={<ReactCompareSliderImage src={currentImage} alt="Generated design" className="compare-img"/>}/>:<div className="compare-fallback"><img src={project?.sourceImage} alt="Before" className="compare-img"/></div>}</div></div>
+        <div className="version-panel panel"><div className="workspace-head"><div><p className="control-label"><History size={14}/> Version history</p><span>Click a prior render to restore it as your working version.</span></div></div><div className="version-list">{(project?.versions||[]).slice().reverse().map(version=><button key={version.id} className={currentImage===version.image?"version active":"version"} onClick={()=>{setCurrentImage(version.image);if(project)void persist({...project,renderedImage:version.image,style:version.style,view:version.view,timestamp:Date.now()});}}><img src={version.image} alt="Saved render version"/><span>{styles.find(item=>item.id===version.style)?.label}</span><small>{views.find(item=>item.id===version.view)?.label} · {new Date(version.createdAt).toLocaleDateString()}</small></button>)}</div></div>
+    </section></div>;
 }
-export default VisualizerId

@@ -25,6 +25,34 @@ interface DesignItem {
     sharedBy?: string | null;
     sharedAt?: string | null;
     isPublic?: boolean;
+    style?: DesignStyle;
+    view?: RenderView;
+    rooms?: RoomDefinition[];
+    versions?: RenderVersion[];
+    shareId?: string | null;
+    updatedAt?: string;
+}
+
+type DesignStyle = "modern" | "scandinavian" | "industrial" | "luxury" | "traditional" | "empty";
+type RenderView = "top-down" | "dollhouse" | "interior" | "night";
+
+interface RoomDefinition {
+    id: string;
+    name: string;
+    type: string;
+    area?: number;
+    floor: string;
+    walls: string;
+    furniture: "none" | "minimal" | "standard" | "full";
+}
+
+interface RenderVersion {
+    id: string;
+    image: string;
+    createdAt: number;
+    style: DesignStyle;
+    view: RenderView;
+    feedback?: string;
 }
 
 interface DesignConfig {
@@ -113,7 +141,7 @@ interface StoreHostedImageParams {
     hosting: HostingConfig | null;
     url: string;
     projectId: string;
-    label: "source" | "rendered";
+    label: string;
 }
 
 interface CreateProjectParams {
@@ -124,4 +152,8 @@ interface CreateProjectParams {
 interface Generate3DViewParams {
     sourceImage: string;
     projectId?: string | null;
+    style?: DesignStyle;
+    view?: RenderView;
+    feedback?: string;
+    rooms?: RoomDefinition[];
 }
